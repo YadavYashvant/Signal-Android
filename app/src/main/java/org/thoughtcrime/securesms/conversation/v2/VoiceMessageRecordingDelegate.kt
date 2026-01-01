@@ -6,6 +6,7 @@
 package org.thoughtcrime.securesms.conversation.v2
 
 import android.content.pm.ActivityInfo
+import android.os.Build
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.fragment.app.Fragment
@@ -50,8 +51,8 @@ class VoiceMessageRecordingDelegate(
 
   fun hasActiveSession(): Boolean = session != null
 
-  fun onRecorderStarted() {
-    beginRecording()
+  fun onRecorderStarted(useWavFormat: Boolean = false) {
+    beginRecording(useWavFormat)
   }
 
   fun onRecorderLocked() {
@@ -95,7 +96,7 @@ class VoiceMessageRecordingDelegate(
   }
 
   @Suppress("DEPRECATION")
-  private fun beginRecording() {
+  private fun beginRecording(useWavFormat: Boolean = false) {
     val vibrator = ServiceUtil.getVibrator(fragment.requireContext())
     vibrator.vibrate(20)
 
@@ -103,7 +104,7 @@ class VoiceMessageRecordingDelegate(
     fragment.requireActivity().requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LOCKED
 
     sessionCallback.onSessionWillBegin()
-    session = Session(audioRecorder.startRecording(), sessionCallback).apply {
+    session = Session(audioRecorder.startRecording(Build.VERSION.SDK_INT >= 26, useWavFormat), sessionCallback).apply {
       addTo(disposables)
     }
   }

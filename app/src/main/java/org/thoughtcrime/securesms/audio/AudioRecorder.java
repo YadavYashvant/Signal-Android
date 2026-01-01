@@ -65,21 +65,25 @@ public class AudioRecorder {
   }
 
   public @NonNull Single<VoiceNoteDraft> startRecording() {
-    return startRecording(Build.VERSION.SDK_INT >= 26);
+    return startRecording(Build.VERSION.SDK_INT >= 26, false);
   }
 
   public @NonNull Single<VoiceNoteDraft> startRecording(final boolean useMediaCodecWrapper) {
-    Log.i(TAG, "startRecording(" + useMediaCodecWrapper + ")");
+    return startRecording(useMediaCodecWrapper, false);
+  }
+
+  public @NonNull Single<VoiceNoteDraft> startRecording(final boolean useMediaCodecWrapper, final boolean useWavFormat) {
+    Log.i(TAG, "startRecording(" + useMediaCodecWrapper + ", useWavFormat=" + useWavFormat + ")");
 
     final SingleSubject<VoiceNoteDraft> recordingSingle = SingleSubject.create();
-    startRecordingInternal(useMediaCodecWrapper, recordingSingle);
+    startRecordingInternal(useMediaCodecWrapper, useWavFormat, recordingSingle);
 
     return recordingSingle;
   }
 
-  private void startRecordingInternal(boolean useMediaRecorderWrapper, SingleSubject<VoiceNoteDraft> recordingSingle) {
+  private void startRecordingInternal(boolean useMediaRecorderWrapper, boolean useWavFormat, SingleSubject<VoiceNoteDraft> recordingSingle) {
     executor.execute(() -> {
-      Log.i(TAG, "Running startRecording(" + useMediaRecorderWrapper + ") + " + Thread.currentThread().getId());
+      Log.i(TAG, "Running startRecording(useMediaRecorderWrapper=" + useMediaRecorderWrapper + ", useWavFormat=" + useWavFormat + ") + " + Thread.currentThread().getId());
       try {
         if (recorder != null) {
           recordingSingle.onError(new IllegalStateException("We can only do one recording at a time!"));
@@ -88,14 +92,20 @@ public class AudioRecorder {
 
         ParcelFileDescriptor fds[] = ParcelFileDescriptor.createPipe();
 
+        String mimeType = useWavFormat ? MediaUtil.AUDIO_WAV : MediaUtil.AUDIO_AAC;
         BlobProvider.BlobBuilder blobBuilder = BlobProvider.getInstance()
                                                            .forData(new ParcelFileDescriptor.AutoCloseInputStream(fds[0]), 0)
-                                                           .withMimeType(MediaUtil.AUDIO_AAC);
+                                                           .withMimeType(mimeType);
 
         recordingUri       = blobBuilder.buildUriForDraftAttachment();
         recordingUriFuture = blobBuilder.createForDraftAttachmentAsync(context);
 
-        recorder = useMediaRecorderWrapper ? new MediaRecorderWrapper() : new AudioCodec();
+        if (useWavFormat) {
+          recorder = new WavRecorder();
+        } else {
+          recorder = useMediaRecorderWrapper ? new MediaRecorderWrapper() : new AudioCodec();
+        }
+
         int focusResult = audioFocusManager.requestAudioFocus();
         if (focusResult != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
           Log.w(TAG, "Could not gain audio focus. Received result code " + focusResult);
@@ -108,8 +118,11 @@ public class AudioRecorder {
         recordingUriFuture = null;
         recorder = null;
         audioFocusManager.abandonAudioFocus();
-        if (useMediaRecorderWrapper) {
-          startRecordingInternal(false, recordingSingle);
+        if (useWavFormat) {
+          // If WAV recording fails, don't fallback - report error
+          recordingSingle.onError(e);
+        } else if (useMediaRecorderWrapper) {
+          startRecordingInternal(false, useWavFormat, recordingSingle);
         } else {
           recordingSingle.onError(e);
         }

@@ -64,6 +64,7 @@ public class MediaUtil {
   public static final String IMAGE_WEBP        = "image/webp";
   public static final String IMAGE_GIF         = "image/gif";
   public static final String AUDIO_AAC         = "audio/aac";
+  public static final String AUDIO_WAV         = "audio/wav";
   public static final String AUDIO_MP4         = "audio/mp4";
   public static final String AUDIO_UNSPECIFIED = "audio/*";
   public static final String VIDEO_MP4         = "video/mp4";
