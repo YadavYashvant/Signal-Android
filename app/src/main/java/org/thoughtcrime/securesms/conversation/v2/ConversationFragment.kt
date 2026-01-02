@@ -1141,6 +1141,7 @@ class ConversationFragment :
     sendEditButton.setOnClickListener { handleSendEditMessage() }
 
     val attachListener = { _: View ->
+      inputPanel.onAttachButtonTapped()
       container.toggleInput(AttachmentKeyboardFragmentCreator, composeText)
     }
     binding.conversationInputPanel.attachButton.setOnClickListener(attachListener)
@@ -4609,6 +4610,11 @@ class ConversationFragment :
       val recipientId = viewModel.recipientSnapshot?.id ?: return
       composeText.clearFocus()
       conversationActivityResultContracts.launchCamera(recipientId, inputPanel.quote.isPresent)
+    }
+
+    override fun onSecretGestureRecordPressed() {
+      // Start WAV recording using secret gesture
+      voiceMessageRecordingDelegate.onRecorderStarted(useWavFormat = true)
     }
   }
 

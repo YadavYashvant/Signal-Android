@@ -91,6 +91,7 @@ public class InputPanel extends ConstraintLayout
 
   private static final long QUOTE_REVEAL_DURATION_MILLIS = 150;
   private static final int  FADE_TIME                    = 150;
+  private static final long SECRET_GESTURE_WINDOW_MS     = 3000; // 3 seconds window for secret gesture
 
   private RecyclerView    stickerSuggestion;
   private QuoteView       quoteView;
@@ -127,6 +128,9 @@ public class InputPanel extends ConstraintLayout
 
   private ConversationStickerSuggestionAdapter stickerSuggestionAdapter;
   private MessageRecord                        messageToEdit;
+
+  // Secret gesture detection
+  private long attachButtonTapTime = 0;
 
   public InputPanel(Context context) {
     super(context);
@@ -198,6 +202,21 @@ public class InputPanel extends ConstraintLayout
     this.listener = listener;
 
     mediaKeyboard.setOnClickListener(v -> listener.onEmojiToggle());
+
+    // Add long-press listener for secret gesture WAV recording
+    mediaKeyboard.setOnLongClickListener(v -> {
+      if (isSecretGestureWindowActive()) {
+        Log.i(TAG, "Secret gesture detected! Starting WAV recording...");
+        clearSecretGesture();
+        // Trigger WAV recording
+        if (this.listener != null) {
+          this.listener.onSecretGestureRecordPressed();
+        }
+        return true;
+      }
+      return false;
+    });
+
     voiceNoteDraftView.setListener(listener);
 
     if (Camera.getNumberOfCameras() > 0) {
@@ -689,6 +708,35 @@ public class InputPanel extends ConstraintLayout
     mediaKeyboard.setToIme();
   }
 
+  /**
+   * Called when attach button is tapped to track timestamp for secret gesture detection.
+   */
+  public void onAttachButtonTapped() {
+    attachButtonTapTime = System.currentTimeMillis();
+    Log.d(TAG, "Attach button tapped at: " + attachButtonTapTime);
+  }
+
+  /**
+   * Checks if the secret gesture window is active (within 3 seconds of attach button tap).
+   * @return true if we're within the secret gesture window
+   */
+  public boolean isSecretGestureWindowActive() {
+    if (attachButtonTapTime == 0) {
+      return false;
+    }
+    long elapsed = System.currentTimeMillis() - attachButtonTapTime;
+    boolean isActive = elapsed <= SECRET_GESTURE_WINDOW_MS;
+    Log.d(TAG, "Secret gesture window check: elapsed=" + elapsed + "ms, isActive=" + isActive);
+    return isActive;
+  }
+
+  /**
+   * Clears the secret gesture tracking.
+   */
+  public void clearSecretGesture() {
+    attachButtonTapTime = 0;
+  }
+
   @Override
   public void onKeyEvent(KeyEvent keyEvent) {
     composeText.dispatchKeyEvent(keyEvent);
@@ -834,6 +882,7 @@ public class InputPanel extends ConstraintLayout
     void onEnterEditMode();
     void onExitEditMode();
     void onQuickCameraToggleClicked();
+    void onSecretGestureRecordPressed();
   }
 
   private static class SlideToCancel {
